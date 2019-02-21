@@ -32,7 +32,7 @@ This package has the following requirements:
 
 ## Usage
 ### How to Run
-To run MetaPred on EHR data, you need to revise the learning settings in main.py and the network hyperparameters in models.py. Then run the shell script metapred.sh.
+To run MetaPred on EHR data, you need to revise the learning settings in main.py and the network hyperparameters in model.py. Then run the shell script metapred.sh.
 ```bash
 bash metapred.sh
 ```
