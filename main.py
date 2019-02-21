@@ -50,7 +50,6 @@ flags.DEFINE_integer('train_update_batch_size', -1, 'number of examples used for
 flags.DEFINE_float('train_update_lr', -1, 'value of inner gradient step step during training. (use if you want to test with a different value)') # 0.1 for omniglot
 
 
-
 def train(data_loader, ifold, exp_string):
     # construct MetaPred model
     print ("constructing MetaPred model ...")

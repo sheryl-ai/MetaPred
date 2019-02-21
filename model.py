@@ -96,7 +96,6 @@ class MetaPred(BaseModel):
         self.build_graph()
 
     ####################################### Networks #######################################
-    ####################################### Parameters #####################################
     def weight_variable(self, shape, name='weights'):
         if FLAGS.pretrain:
             initial = self.pretrain_weights[name]

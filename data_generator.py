@@ -42,7 +42,6 @@ DM_icd = ['290.', '291.', '294.', '331.82', '331.83'] # Dementia
 root = '~/Documents/data/ohsu/'
 file_plist = root + f_dxlst
 file_dx = root + f_dx
-
 numlines_plist =35459836
 numlines_dx = 32403450
 
