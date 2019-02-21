@@ -16,11 +16,11 @@ The entire learning procedure can be viewed as: iteratively transfer the paramet
 
 The learn representation of five given disease domains are shown using the t-SNE. In detail, AD, PD, DM, AM, MCI are abbreviations of Alzheimer's Disease, Parkinson's Disease, Dementia, Amnesia and Mild Cognitive Impairment, respectively. As a patient might suffer multiple diseases, there are supposed to have some overlaps among the given domains.
 
-<p align="center"><img src="figures/patient_vis_metapred.png" alt="Visualization of patient representation learned by MetaPred" width="350"></p>
+<p align="center"><img src="figures/patient_vis_metapred.png" alt="Visualization of patient representation learned by MetaPred" width="500"></p>
 
 To demonstrate the effectiveness of the proposed MetaPred in the context of domain adaptation, we compare it with the state-of-the-art meta-learning algorithm "Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks" (MAML). The results on Alzheimer's Disease domain is presented in terms of AUC and F1-Score.
 
-<p align="center"><img src="figures/vs_maml_ad.png" alt="Performance comparison of MetaPred and MAML on the top of Alzheimer's Disease" width="350"></p>
+<p align="center"><img src="figures/vs_maml_ad.png" alt="Performance comparison of MetaPred and MAML on the top of Alzheimer's Disease" width="500"></p>
 
 
 ## Requirements
