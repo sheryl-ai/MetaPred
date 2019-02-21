@@ -32,11 +32,11 @@ This package has the following requirements:
 
 ## Usage
 ### How to Run
-To run MetaPred on EHR data, you need to revise the learning settings in main.py and the network hyperparameters in models.py. Then run the shell script metapred.sh
+To run MetaPred on EHR data, you need to revise the learning settings in main.py and the network hyperparameters in models.py. Then run the shell script metapred.sh.
 ```bash
 bash metapred.sh
 ```
-Our learning parameters are set as:
+Our settings of learning procedures are:
 ```bash
 python main.py --method='cnn' --metatrain_iterations=10000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
 ```
@@ -44,3 +44,8 @@ or
 ```bash
 python main.py --method='rnn' --metatrain_iterations=10000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
 ```
+
+### Additional Material
+There is implementations used in:
+
+Chelsea Finn, Pieter Abbeel, Sergey Levine, [Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks](https://arxiv.org/abs/1703.03400), International Conference on Machine Learning (ICML) 2017.
