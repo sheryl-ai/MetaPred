@@ -2,7 +2,7 @@
 
 ## Overview
 
-MetaPred is a meta-learning framework for  Clinical Risk Prediction using limited Patient Electronic Health Records. We given an example in the following figure:
+MetaPred is a meta-learning framework for  Clinical Risk Prediction using limited patient Electronic Health Records (EHRs). We given an example in the following figure:
 
 <p align="center"><img src="figures/task-design.png" alt=" Illustration of the proposed learning procedure" width="500"></p>
 
