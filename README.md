@@ -14,7 +14,7 @@ The entire learning procedure can be viewed as: iteratively transfer the paramet
 
 ## Results
 
-The learn representation of five given disease domains are shown using the t-SNE. In detail, AD, PD, DM, AM, MCI are abbreviations of Alzheimer's Disease, Parkinson's Disease, Dementia, Amnesia and Mild Cognitive Impairment, respectively. As a patient might suffer multiple diseases, there are supposed to have some overlaps among the given domains.
+The learn representation of five given disease domains are shown using the t-SNE. In detail, AD, PD, DM, AM, MCI are abbreviations of Alzheimer's Disease, Parkinson's Disease, Dementia, Amnesia and Mild Cognitive Impairment, respectively. As a patient might suffer multiple diseases, there is supposed to be some overlaps among the given domains.
 
 <p align="center"><img src="figures/patient_vis_metapred.png" alt="Visualization of patient representation learned by MetaPred" width="500"></p>
 
