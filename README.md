@@ -18,7 +18,7 @@ The learn representation of five given disease domains are shown using the t-SNE
 
 <p align="center"><img src="figures/patient_vis_metapred.png" alt="Visualization of patient representation learned by MetaPred" width="500"></p>
 
-To demonstrate the effectiveness of the proposed MetaPred in the context of domain adaptation, we compare it with the state-of-the-art meta-learning algorithm "Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks" (MAML). The results on Alzheimer's Disease domain is presented in terms of AUC and F1-Score.
+To demonstrate the effectiveness of the proposed MetaPred in the context of domain adaptation, we compare it with the state-of-the-art meta-learning algorithm ``Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks`` (MAML). The results on Alzheimer's Disease domain is presented in terms of AUC and F1-Score.
 
 <p align="center"><img src="figures/vs_maml_ad.png" alt="Performance comparison of MetaPred and MAML on the top of Alzheimer's Disease" width="500"></p>
 
@@ -48,4 +48,4 @@ python main.py --method='rnn' --metatrain_iterations=10000 --meta_batch_size=32 
 ### Additional Material
 There is implementations used in:
 
-Chelsea Finn, Pieter Abbeel, Sergey Levine, [Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks](https://arxiv.org/abs/1703.03400), International Conference on Machine Learning (ICML) 2017.
+Chelsea Finn, Pieter Abbeel, Sergey Levine, [Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks](https://arxiv.org/abs/1703.03400), International Conference on Machine Learning (ICML), 2017.
