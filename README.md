@@ -10,7 +10,7 @@ Suppose we have multiple domains, our goal is to predict Alzheimer’s disease w
 
 <p align="center"><img src="figures/MetaPred.png" alt="MetaPred framework overview" width="500"></p>
 
-The entire learning procedure can be viewed as: iteratively transfer the parameter Θ learned from source domains through utilizing it as the initialization of the parameter that needs to be updated in the target domain. The learn representation of five given disease domains are shown using the t-SNE. In detail, AD, PD, DM, AM, MCI are abbreviations of Alzheimer's Disease, Parkinson's Disease, Dementia, Amnesia and Mild Cognitive Impairment. As a patient might suffer multiple diseases, there are supposed to have some overlaps among the given domains. 
+The entire learning procedure can be viewed as: iteratively transfer the parameter Θ learned from source domains through utilizing it as the initialization of the parameter that needs to be updated in the target domain. The learn representation of five given disease domains are shown using the t-SNE. In detail, AD, PD, DM, AM, MCI are abbreviations of Alzheimer's Disease, Parkinson's Disease, Dementia, Amnesia and Mild Cognitive Impairment. As a patient might suffer multiple diseases, there are supposed to have some overlaps among the given domains.
 
 <p align="center"><img src="figures/patient_vis_metapred.png" alt="Visualization of patient representation learned by MetaPred" width="350"></p>
 
@@ -35,9 +35,9 @@ bash metapred.sh
 ```
 Our learning parameters are set as:
 ```bash
-python main.py --method='cnn' --metatrain_iterations=5000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
+python main.py --method='cnn' --metatrain_iterations=10000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
 ```
 or
 ```bash
-python main.py --method='rnn' --metatrain_iterations=5000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
+python main.py --method='rnn' --metatrain_iterations=10000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
 ```
