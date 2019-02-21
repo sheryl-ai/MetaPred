@@ -18,7 +18,6 @@ FLAGS = flags.FLAGS
 ######################
 f_dxlst = 'Dodge_eirb17110_Diagnoses_Problem_List.csv' #6G
 f_dx = 'Dodge_eirb17110_Diagnoses_Encounters.csv' #6G
-# not all the variables are useful, here we only consider diagnosis problem listdir and encounters
 
 VISIT_NUM = 0
 
@@ -39,7 +38,7 @@ HD_icd = ['333.4'] # Huntington’s Disease
 MO_icd = ['331.3', '331.4', '331.5'] # Mechanical Obstructions
 AM_icd = ['780.93'] # Amnesia
 DM_icd = ['290.', '291.', '294.', '331.82', '331.83'] # Dementia
-# AD_MCI_icd = ['331.0', '331.2', '331.6', '331.7', '331.83', '331.89', '331.9', '331.90'] # the union set of ad and mci
+
 root = '~/Documents/data/ohsu/'
 file_plist = root + f_dxlst
 file_dx = root + f_dx
@@ -65,13 +64,12 @@ class DataGenerator(object):
         self.total_lines= [numlines_plist, numlines_dx]
         self.feature_sets = [['DX_ICD', 'DX_START_DATE', 'DX_END_DATE'], ['ICD9_CODE', 'DX_DATE']]
         self.diseases = {'AD':AD_icd, 'PD':PD_icd, 'FD':FD_icd, 'HD':HD_icd, 'MO':MO_icd, 'MCI':MCI_icd, 'AM':AM_icd, 'DM':DM_icd}
-        self.target = 'MCI'
+        self.target = 'AD'
         self.min_seq_len = 5
         self.icd2idx = dict()
         self.age_dist = {(55, 60):0, (60, 65):0, (65, 70):0, (70, 75):0, (75, 80):0, (80, 85):0, (85, 90):0, (90, 95):0, (95, 100):0}
-        # self.age_dist = {(50, 60):0, (60, 70):0, (70, 80):0, (80, 90):0, (90, 100):0}
         self.read_data()
-        # self.save_files()
+        self.save_files()
 
     def read_data(self):
         '''read and store data files into dictionary with matrices as values.
@@ -255,6 +253,7 @@ class DataGenerator(object):
                         X[s]= features
                         y[s] = 1
                         self.compute_age(start, end)
+
                         count += 1
                         #### format: x = (feature matrix, list of positive targets) ####
                         # np.save(savefile + s, (features, targets))
@@ -464,20 +463,20 @@ class DataGenerator(object):
     def save_files(self):
         print ("save files")
         print ("patients ...")
-        f = open(self.intmd_path + self.target + '.pos.pkl', 'wb')
+        f = open(self.intmd_path + self.target + '.pos_.pkl', 'wb')
         pkl.dump((self.X_pos, self.y_pos), f, protocol=2)
         f.close()
         print ("controls ...")
-        f = open(self.intmd_path + self.target + '.neg.pkl', 'wb')
+        f = open(self.intmd_path + self.target + '.neg_.pkl', 'wb')
         pkl.dump((self.X_neg, self.y_neg), f, protocol=2)
         f.close()
         print ("then, save 2 very large matrices ...")
         print ("cases ...")
-        f = open(self.intmd_path + self.target + '.pos.mat.pkl', 'wb')
+        f = open(self.intmd_path + self.target + '.pos.mat_.pkl', 'wb')
         pkl.dump((self.X_pos_mat, self.y_pos_mat), f, protocol=2)
         f.close()
         print ("controls ...")
-        f = open(self.intmd_path + self.target + '.neg.mat.pkl', 'wb')
+        f = open(self.intmd_path + self.target + '.neg.mat_.pkl', 'wb')
         pkl.dump((self.X_neg_mat, self.y_neg_mat), f, protocol=2)
         f.close()
         print ("all files saved!")

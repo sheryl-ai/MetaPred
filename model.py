@@ -1,13 +1,11 @@
-""" Code for the MAML algorithm and network architecture. """
+""" Code for the MetaPred algorithm and network architecture. """
 import numpy as np
 import sklearn
 import tensorflow as tf
-# import collections
 import os, time, shutil, collections
 
 import tensorflow.contrib.layers as layers
 from tensorflow.contrib.rnn import RNNCell
-
 from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
@@ -59,11 +57,11 @@ class BaseModel(object):
         '''cross entropy'''
         # Note - with tf version <=0.12, this loss has incorrect 2nd derivatives
         label = tf.one_hot(label, FLAGS.n_classes)
-        return tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=label) / FLAGS.update_batch_size
+        return tf.nn.softmax_cross_entropy_with_logits_v2(logits=pred, labels=label) / FLAGS.update_batch_size
 
 
-class MAML(BaseModel):
-    def __init__(self, data_loader, pretrain_m, meta_lr=1e-3, update_lr=1e-2, test_num_updates=-1):
+class MetaPred(BaseModel):
+    def __init__(self, data_loader, meta_lr=1e-3, update_lr=1e-2, test_num_updates=-1):
         """
         Args:
             dim_input: dimension of input data (for mlps)
@@ -72,9 +70,6 @@ class MAML(BaseModel):
             update_lr: step size alpha for inner gradient update
         """
         super().__init__()
-        if pretrain_m is not None:
-            self.pretrain_weights = pretrain_m.weights_for_init
-            # print (self.pretrain_weights)
 
         self.data_loader = data_loader
         self.dim_input = data_loader.dim_input
@@ -90,10 +85,7 @@ class MAML(BaseModel):
         print('method:', "meta-"+FLAGS.method, 'data shape:', self.dim_input, 'meta-bz:', FLAGS.meta_batch_size, 'update-bz:', FLAGS.update_batch_size, \
              'num update:', FLAGS.num_updates, 'meta-lr:', meta_lr, 'update-lr:', update_lr)
 
-        if FLAGS.method == "mlp":
-            # fully connected network configuration
-            self.fc_config()
-        elif FLAGS.method == "cnn":
+        if FLAGS.method == "cnn":
             # sequential network (cnn) configuration
             self.cnn_config(data_loader)
         elif FLAGS.method == "rnn":
@@ -132,14 +124,6 @@ class MAML(BaseModel):
         return var
 
     ############################### Fully Conneted Network #################################
-    def fc_config(self, init_std=0.05):
-        # Network Parameters
-        self.init_std = init_std
-        self.n_hidden_1 = 128
-        self.n_hidden_2 = 128
-        self.dim_hidden = [self.n_hidden_1, self.n_hidden_2, FLAGS.n_classes] # hidden dimensions
-        self.learner = self.fc_forward
-
     # construct weights
     def build_fc_weights(self, dim_in, weights):
         for i, dim in enumerate(self.dim_hidden):
@@ -153,20 +137,6 @@ class MAML(BaseModel):
         """Fully connected layer with Mout features."""
         x = tf.matmul(x, W) + b
         return tf.nn.relu(x) if relu else x
-
-    def fc_forward(self, x, weights, dropout, reuse=False, is_training=False, type="source"):
-        #  is_training isn't use here
-        for i, dim in enumerate(self.dim_hidden[:-1]):
-            x = self.fc(x, weights["fc_W"+str(i)], weights["fc_b"+str(i)])
-            x = tf.nn.dropout(x, dropout)
-
-        x_rep = tf.identity(x)
-
-        # Logits linear layer, i.e. softmax without normalization.
-        N, Min = x.get_shape()
-        i = len(self.dim_hidden)-1
-        logits = self.fc(x, weights["fc_W"+str(i)], weights["fc_b"+str(i)], relu=False)
-        return logits, x_rep
 
     ############################ Embedding Layer for SeqNet ################################
     def build_emb_weights(self, weights):
@@ -227,11 +197,11 @@ class MAML(BaseModel):
                     name="conv")
                 # Apply nonlinearity
                 h = tf.nn.leaky_relu(tf.nn.bias_add(conv_, b), name="relu")
-                # with tf.name_scope("bnorm{}".format(filter_size)) as scope:
-                #     h = layers.batch_norm(h, updates_collections=None,
-                #                              decay=0.99,
-                #                              scale=True, center=True,
-                #                              is_training=is_training, reuse=tf.AUTO_REUSE, scope=scope)
+                with tf.name_scope("bnorm{}".format(filter_size)) as scope:
+                    h = layers.batch_norm(h, updates_collections=None,
+                                             decay=0.99,
+                                             scale=True, center=True,
+                                             is_training=is_training, reuse=tf.AUTO_REUSE, scope=scope)
                 # Maxpooling over the outputs
                 pooled = tf.nn.max_pool(
                 h,
@@ -245,35 +215,25 @@ class MAML(BaseModel):
         num_filters_total = self.n_filters * len(self.filter_sizes)
         h_pool = tf.concat(pooled_outputs, 3)
         h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
-        # print (h_pool_flat.get_shape())
         return h_pool_flat
 
     def cnn_sequential(self, x, weights, dropout, reuse=False, is_training=True, type="source"):
-        # Wemb = tf.Variable(tf.random_normal([self.n_words, self.n_hidden], stddev=self.init_std))
-        # with tf.variable_scope("emb", reuse=tf.AUTO_REUSE) as scope:
-        #     Wemb_mask = tf.get_variable("mask_padding", initializer=MASK_ARRAY, dtype="float32", trainable=False)
-        # xemb = self.embedding(x, Wemb, Wemb_mask)
-        # xemb = self.embedding(x, weights["emb_W"], Wemb_mask)
         xemb = self.embedding(x, weights["emb_W"], weights["emb_mask_W"])
 
         # convolutional network
-        # print(xemb.get_shape())
         hout = self.conv(xemb, weights, is_training)
 
         h_ = layers.dropout(hout, keep_prob=dropout)
-        # print (h_.get_shape())
 
         for i, dim in enumerate(self.dim_hidden[:-1]):
             h_ = self.fc(h_, weights["fc_W"+str(i)], weights["fc_b"+str(i)])
             h_ = tf.nn.dropout(h_, dropout)
 
-        x_rep = tf.identity(h_)
-
         # Logits linear layer, i.e. softmax without normalization.
         N, Min = h_.get_shape()
         i = len(self.dim_hidden)-1
         logits = self.fc(h_, weights["fc_W"+str(i)], weights["fc_b"+str(i)], relu=False)
-        return logits, x_rep
+        return logits
 
     ############################ Recurrent Neural Network ##############################
     def rnn_config(self, data_loader, init_std=0.05):
@@ -291,7 +251,6 @@ class MAML(BaseModel):
         self.learner = self.rnn_sequential
 
     def build_lstm_weights(self, weights):
-        #
         # # Keep W_xh and W_hh separate here as well to reuse initialization methods
         # with tf.variable_scope(scope or type(self).__name__):
         weights["lstm_W_xh"] = tf.get_variable('lstm_W_xh', [self.n_hidden, 4 * self.n_hidden],
@@ -305,7 +264,6 @@ class MAML(BaseModel):
         def _initializer(shape, dtype=tf.float32, partition_info=None):
             """Ugly cause LSTM params calculated in one matrix multiply"""
             size = shape[0]
-            # gate (j) is identity
             t = np.zeros(shape)
             t[:, size:size * 2] = np.identity(size) * scale
             t[:, :size] = self.orthogonal([size, size])
@@ -366,30 +324,18 @@ class MAML(BaseModel):
         with self.graph.as_default():
             # Inputs.
             with tf.name_scope('inputs'):
-                # the 3-rd dimension of input_s and input_t is data_shape, i.e., 1016
-                if FLAGS.method == "mlp":
-                    self.input_s = tf.placeholder(tf.float32, (FLAGS.meta_batch_size, (self.n_tasks-1) * FLAGS.update_batch_size, self.dim_input[0]), 'source_x')
-                    self.input_t = tf.placeholder(tf.float32, (FLAGS.meta_batch_size, FLAGS.update_batch_size, self.dim_input[0]), 'target_x')
-
-                elif FLAGS.method == "cnn" or FLAGS.method == "rnn":
-                    self.input_s = tf.placeholder(tf.int32, (FLAGS.meta_batch_size, (self.n_tasks-1) * FLAGS.update_batch_size, self.timesteps, self.code_size), 'source_x')
-                    self.input_t = tf.placeholder(tf.int32, (FLAGS.meta_batch_size, FLAGS.update_batch_size, self.timesteps, self.code_size), 'target_x')
-                self.ph_training = tf.placeholder(tf.bool, name='trainingFlag')
+                self.input_s = tf.placeholder(tf.int32, (FLAGS.meta_batch_size, (self.n_tasks-1) * FLAGS.update_batch_size, self.timesteps, self.code_size), 'source_x')
+                self.input_t = tf.placeholder(tf.int32, (FLAGS.meta_batch_size, FLAGS.update_batch_size, self.timesteps, self.code_size), 'target_x')
                 self.label_s = tf.placeholder(tf.int64, (FLAGS.meta_batch_size, (self.n_tasks-1) * FLAGS.update_batch_size), 'source_y')
                 self.label_t = tf.placeholder(tf.int64, (FLAGS.meta_batch_size, FLAGS.update_batch_size), 'target_y')
+
+                self.ph_training = tf.placeholder(tf.bool, name='trainingFlag')
                 self.ph_dropout = tf.placeholder(tf.float32, (), 'dropout')
 
             # Model.
             # construct metatrain_ and metaval_
-            if FLAGS.method == "mlp":
-                 # if FLAGS.train:
-                 self.build_model((self.input_s, self.input_t, self.label_s, self.label_t), prefix='metatrain_', is_training=self.ph_training)
-                 # self.build_model((self.input_s, self.input_t, self.label_s, self.label_t), prefix='metaval_') # validate set
-
-            elif FLAGS.method == "cnn" or FLAGS.method == "rnn":
-                if FLAGS.train:
-                    self.build_model((self.input_s, self.input_t, self.label_s, self.label_t), prefix='metatrain_', is_training=self.ph_training)
-                # self.build_model((self.input_s, self.input_t, self.label_s, self.label_t), prefix='metaval_', is_training=self.ph_training) # validate set
+            if FLAGS.method == "cnn" or FLAGS.method == "rnn":
+                self.build_model((self.input_s, self.input_t, self.label_s, self.label_t), prefix='metatrain_', is_training=self.ph_training)
 
             # Initialize variables, i.e. weights and biases.
             self.op_init = tf.global_variables_initializer()
@@ -403,13 +349,6 @@ class MAML(BaseModel):
         self.graph.finalize()
 
     def get_op_variables(self):
-        if FLAGS.method == "mlp":
-            op_weights = dict()
-            op_var = tf.trainable_variables()
-            # fully connected
-            for i, dim in enumerate(self.dim_hidden):
-                op_weights["fc_W"+str(i)] = [v for v in op_var if "fc_W"+str(i) in v.name][0]
-                op_weights["fc_b"+str(i)] = [v for v in op_var if "fc_b"+str(i) in v.name][0]
         if FLAGS.method == "cnn":
             op_weights = dict()
             op_var = tf.trainable_variables()
@@ -426,7 +365,6 @@ class MAML(BaseModel):
         elif FLAGS.method == "rnn":
             op_weights = dict()
             op_var = tf.trainable_variables()
-            print (op_var)
             # embedding
             op_weights["emb_W"] = [v for v in op_var if "emb_W" in v.name][0]
             # lstm
@@ -437,16 +375,11 @@ class MAML(BaseModel):
             for i, dim in enumerate(self.dim_hidden):
                 op_weights["fc_W"+str(i)] = [v for v in op_var if "fc_W"+str(i) in v.name ][0]
                 op_weights["fc_b"+str(i)] = [v for v in op_var if "fc_b"+str(i) in v.name][0]
-        print ('show variable')
-        print(op_var)
         return op_weights
 
     def build_weights(self):
         weights = {}
-        if FLAGS.method == "mlp":
-            dim_in = self.dim_input[0]
-            weights = self.build_fc_weights(dim_in, weights)
-        elif FLAGS.method == "cnn":
+        if FLAGS.method == "cnn":
             weights = self.build_emb_weights(weights)
             weights = self.build_conv_weights(weights)
             weights = self.build_fc_weights(self.n_filters * len(self.filter_sizes), weights)
@@ -471,11 +404,6 @@ class MAML(BaseModel):
         """
         # source: training data for inner gradient, target: test data for meta gradient
         source_xb, target_xb, source_yb, target_yb = input_tensors
-        # print ('---')
-        # print (source_xb.get_shape())
-        # print (target_xb.get_shape())
-        # print (source_yb.get_shape())
-        # print (target_yb.get_shape())
 
         # create or reuse network variable, not including batch_norm variable, therefore we need extra reuse mechnism
         # to reuse batch_norm variables.
@@ -549,8 +477,6 @@ class MAML(BaseModel):
                     # update theta_pi according to varibles
                     fast_weights = dict(zip(fast_weights.keys(), [fast_weights[key] - tf.multiply(self.update_lr, gvs[key])
                                           for key in fast_weights.keys()]))
-                    # fast_weights = dict(zip(fast_weights.keys(), [fast_weights[key] - self.update_lr * gvs[key]
-                                          # for key in fast_weights.keys()]))
 
                     # forward on theta_pi
                     target_pred, target_represent = self.learner(target_x, fast_weights, self.ph_dropout, reuse=True, is_training=is_training, type="target")
@@ -559,9 +485,7 @@ class MAML(BaseModel):
                     target_preds.append(target_pred)
                     target_losses.append(target_loss)
                     target_represents.append(target_represent)
-                    print (target_pred.get_shape())
-                    print (len(target_preds))
-                    print (len(target_represents))
+
 
                 task_output = [target_represents, source_pred, target_preds, source_loss, target_losses]
                 for j in range(num_updates):
@@ -582,7 +506,6 @@ class MAML(BaseModel):
                            source_acc_tasks, target_accs_tasks = result
 
         ## Performance & Optimization
-        # if 'train' in prefix:
         # average loss
         self.source_loss = source_loss = tf.reduce_sum(source_loss_tasks) / FLAGS.meta_batch_size
         # [avgloss_T1, avgloss_T2, ..., avgloss_TK]
@@ -593,28 +516,15 @@ class MAML(BaseModel):
                                             for j in range(num_updates)]
         self.source_pred = source_pred_tasks
         self.target_preds = target_preds_tasks[FLAGS.num_updates-1]
-        # if is_training is False:
         self.target_represent = target_represents_tasks[FLAGS.num_updates-1]
-        # self.pretrain_op = tf.train.AdamOptimizer(self.meta_lr).minimize(source_loss)
 
-
-        # meta-train optim
-        optimizer = tf.train.AdamOptimizer(self.meta_lr, name='meta_optim')
-        # meta-train gradients, target_losses[-1] is the accumulated loss across over tasks.
-        # self.gvs = gvs = optimizer.compute_gradients(self.target_losses[FLAGS.num_updates-1])
-        self.gvs = gvs = optimizer.compute_gradients(self.source_loss + self.target_losses[FLAGS.num_updates-1])
-        # update theta
-        self.metatrain_op = optimizer.apply_gradients(gvs)
-
-        # else: #eval or test
-        #     self.metaval_source_pred = source_pred_tasks
-        #     self.metaval_target_preds = target_preds_tasks[FLAGS.num_updates-1]
-        #     self.metaval_source_loss = source_loss = tf.reduce_sum(source_loss_tasks) / FLAGS.meta_batch_size
-        #     self.metaval_target_losses = target_losses = [tf.reduce_sum(target_losses_tasks[j]) / FLAGS.meta_batch_size
-        #                                            for j in range(num_updates)]
-        #     self.metaval_source_acc = source_acc = tf.reduce_sum(source_acc_tasks) / FLAGS.meta_batch_size
-        #     self.metaval_target_accs = target_accs = [tf.reduce_sum(target_accs_tasks[j]) / FLAGS.meta_batch_size
-        #                                            for j in range(num_updates)]
+        if self.ph_training is not False:
+            # meta-train optim
+            optimizer = tf.train.AdamOptimizer(self.meta_lr, name='meta_optim')
+            # meta-train gradients, target_losses[-1] is the accumulated loss across over tasks.
+            self.gvs = gvs = optimizer.compute_gradients(self.source_loss + self.target_losses[FLAGS.num_updates-1])
+            # update theta
+            self.metatrain_op = optimizer.apply_gradients(gvs)
 
         ## Summaries
         # NOTICE: every time build model, support_loss will be added to the summary, but it's different.
@@ -635,41 +545,6 @@ class MAML(BaseModel):
         f1score = sklearn.metrics.f1_score(labels, predictions,  'micro')
         return auc, ap, f1score
 
-    def get_represent(self, episodes, sess=None):
-
-        represent_tasks = dict()
-        # print (episodes)
-        for task in episodes:
-            size = len(episodes[task])
-            data_tuple_show = (self.data_loader.data_s, self.data_loader.data_to_show[task], self.data_loader.label_s, self.data_loader.label_to_show[task])
-            for begin in range(0, size, FLAGS.meta_batch_size):
-                end = begin + FLAGS.meta_batch_size
-                end = min([end, size])
-                if end-begin < FLAGS.meta_batch_size: break
-
-                batch_idx = range(begin, end)
-                sample, label = self.get_feed_data(episodes[task], batch_idx, data_tuple_show, is_training=False, is_show=True)
-
-                if FLAGS.method == "mlp":
-                    X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :])
-                    X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :])
-                    y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                    y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                    print (X_tensor_s.shape)
-                    print (X_tensor_t.shape)
-                    feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: 1, self.ph_training: False}
-
-                elif FLAGS.method == "rnn" or FLAGS.method == "cnn":
-                    X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
-                    X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
-                    y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                    y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                    feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: 1, self.ph_training: False}
-
-                input_tensors = [self.target_represent]
-                represent_tasks[task] = sess.run(input_tensors, feed_dict)
-
-        return represent_tasks
 
     # def evaluate(self, sample, label, sess=None, prefix="metaval_"):
     def evaluate(self, episode, data_tuple_val, sess=None, prefix="metaval_"):
@@ -685,28 +560,12 @@ class MAML(BaseModel):
             batch_idx = range(begin, end)
             sample, label = self.get_feed_data(episode, batch_idx, data_tuple_val, is_training=False)
 
-            if FLAGS.method == "mlp":
-                X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :])
-                X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :])
-                y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                # X_tensor_s = self.convert_to_array(sample[begin:end, :(self.n_tasks-1) * FLAGS.update_batch_size, :])
-                # X_tensor_t = self.convert_to_array(sample[begin:end, (self.n_tasks-1) * FLAGS.update_batch_size:, :])
-                # y_tensor_s = self.convert_to_array(label[begin:end, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                # y_tensor_t = self.convert_to_array(label[begin:end, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: 1,  self.ph_training: False}
+            X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
+            X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
+            y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
+            y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
 
-            elif FLAGS.method == "rnn" or FLAGS.method == "cnn":
-                X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
-                X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
-                y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                # X_tensor_s = self.convert_to_array(sample[begin:end, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
-                # X_tensor_t = self.convert_to_array(sample[begin:end, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
-                # y_tensor_s = self.convert_to_array(label[begin:end, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                # y_tensor_t = self.convert_to_array(label[begin:end, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: 1, self.ph_training: False}
-
+            feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: 1, self.ph_training: False}
             input_tensors = [self.target_preds, self.target_accs[FLAGS.num_updates-1]]
             metaval_target_preds, metaval_target_accs = sess.run(input_tensors, feed_dict)
             target_acc.append(metaval_target_accs)
@@ -718,7 +577,7 @@ class MAML(BaseModel):
 
         target_acc = np.mean(target_acc)
         target_auc, target_ap, target_f1 = self.compute_metrics(target_preds, target_vals)
-        # return source_acc, target_acc, target_auc, target_ap, target_f1
+
         return target_acc, target_auc, target_ap, target_f1
 
 
@@ -742,14 +601,12 @@ class MAML(BaseModel):
                 lbl.extend(label_s[i][s_idx])
                 n_source += n_samples_per_task
             ### do not keep pos/neg ratio
-            if is_training is True:
-                # t_idx = data_idx[len(data_idx)-n_samples_per_task:]
+            if is_training:
                 t_idx = data_idx[n_source:]
                 spl.extend(data_t[0][t_idx])
                 lbl.extend(label_t[0][t_idx])
-            elif is_training is False:
+            else:
                 t_idx = data_idx[n_source:]
-                # t_idx = data_idx[len(data_idx)-n_samples_per_task:]
                 spl.extend(data_t[t_idx])
                 lbl.extend(label_t[t_idx])
 
@@ -763,9 +620,7 @@ class MAML(BaseModel):
         return sample, label
 
 
-    # def fit(self, sample, label, sample_val, label_val, exp_string, model_file = None):
     def fit(self, episode, episode_val, ifold, exp_string, model_file = None):
-        # print (ifold)
         sess = tf.Session(graph=self.graph)
         if FLAGS.resume or not FLAGS.train:
             model_file = tf.train.latest_checkpoint(FLAGS.logdir + '/' + exp_string)
@@ -778,13 +633,10 @@ class MAML(BaseModel):
         if FLAGS.log:
             train_writer = tf.summary.FileWriter(FLAGS.logdir + '/' + exp_string, sess.graph)
 
-        # write graph to tensorboard
-        # tb = tf.summary.FileWriter(os.path.join('logs', 'mini'), sess.graph)
         # load data for metatrain
         data_tuple = (self.data_loader.data_s, self.data_loader.data_t, self.data_loader.label_s, self.data_loader.label_t)
         # load data for metaeval
         data_tuple_val = (self.data_loader.data_s, self.data_loader.data_tt_val[ifold], self.data_loader.label_s, self.data_loader.label_tt_val[ifold])
-
 
         prelosses, postlosses, preaccs, postaccs = [], [], [], []
 
@@ -800,31 +652,14 @@ class MAML(BaseModel):
 
             if len(indices) < FLAGS.meta_batch_size:
                  indices.extend(np.random.permutation(len(episode)))
-                 # indices.extend(np.random.permutation(len(label)))
             batch_idx = [indices.popleft() for i in range(FLAGS.meta_batch_size)]
             sample, label = self.get_feed_data(episode, batch_idx, data_tuple, is_training=True)
 
-            if FLAGS.method == "mlp":
-                # X_tensor_s = self.convert_to_array(sample[batch_idx, :(self.n_tasks-1) * FLAGS.update_batch_size, :])
-                # X_tensor_t = self.convert_to_array(sample[batch_idx, (self.n_tasks-1) * FLAGS.update_batch_size:, :])
-                # y_tensor_s = self.convert_to_array(label[batch_idx, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                # y_tensor_t = self.convert_to_array(label[batch_idx, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :])
-                X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :])
-                y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: FLAGS.dropout, self.ph_training: True}
-
-            elif FLAGS.method == "rnn" or FLAGS.method == "cnn":
-                # X_tensor_s = self.convert_to_array(sample[batch_idx, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
-                # X_tensor_t = self.convert_to_array(sample[batch_idx, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
-                # y_tensor_s = self.convert_to_array(label[batch_idx, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                # y_tensor_t = self.convert_to_array(label[batch_idx, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
-                X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
-                y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
-                y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
-                feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: FLAGS.dropout, self.ph_training: True}
+            X_tensor_s = self.convert_to_array(sample[:, :(self.n_tasks-1) * FLAGS.update_batch_size, :, :])
+            X_tensor_t = self.convert_to_array(sample[:, (self.n_tasks-1) * FLAGS.update_batch_size:, :, :])
+            y_tensor_s = self.convert_to_array(label[:, :(self.n_tasks-1) * FLAGS.update_batch_size])
+            y_tensor_t = self.convert_to_array(label[:, (self.n_tasks-1) * FLAGS.update_batch_size:])
+            feed_dict = {self.input_s: X_tensor_s, self.input_t: X_tensor_t, self.label_s: y_tensor_s, self.label_t: y_tensor_t, self.ph_dropout: FLAGS.dropout, self.ph_training: True}
 
             result = sess.run(input_tensors, feed_dict)
             if itr % SUMMARY_INTERVAL == 0:
@@ -840,7 +675,6 @@ class MAML(BaseModel):
                 print_str = 'Iteration ' + str(itr)
                 print_str += ': sacc: ' + str(np.mean(preaccs)) + ', tacc: ' + str(np.mean(postaccs))
                 print_str += " tauc: " + str(postauc) + " tap: " + str(postap) + " tf1: " + str(postf1)
-                # + str(np.mean(prelosses)) + ', ' + str(np.mean(postlosses))
                 print(print_str)
                 preaccs, postaccs = [], []
                 prelosses, postlosses = [], []
@@ -861,7 +695,6 @@ class MAML(BaseModel):
         feed_dict = {}
         for k in self.op_weights:
              self.weights_for_finetune[k] = sess.run([self.op_weights[k]], feed_dict)[0]
-
         return sess
 
 

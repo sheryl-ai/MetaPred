@@ -1,6 +1,6 @@
 """ Code for data loader """
 import numpy as np
-import os, sys
+import os, sys, copy
 import random
 import tensorflow as tf
 
@@ -17,6 +17,7 @@ PADDING_ID = 1016 # make the padding id as the number of group code
 N_WORDS = 1017
 TIMESTEPS = 21 # choice by statistics
 
+TASKS = ["AD", "PD", "DM", "AM", "MCI"]
 
 class DataLoader(object):
     '''
@@ -42,14 +43,12 @@ class DataLoader(object):
         #                            # in order to use in pretrain
         self.task_code_size = dict() # maintain a dictionary for icd codes, disease : code list
         print ("The selected timesteps is: ", self.timesteps)
-        # self.code_list = []
-        # for task in self.code_dict:
-        #     self.code_list += self.code_dict[task]
-        # self.code_size = len(set(self.code_list))
+
         self.data_to_show = dict()
         self.label_to_show = dict()
         self.ratio_t = 0.8
         self.pat_reduce = False
+        self.code_set = set()
         self.data_s, self.data_t, self.label_s, self.label_t = self.load_data()
 
         ## load data: validate & test
@@ -69,6 +68,13 @@ class DataLoader(object):
 
             for i in range(len(self.target)):
                 self.data_t[i], self.label_t[i] = self.get_data_prepared(self.data_t[i], self.label_t[i])
+
+        # self.code_set = set(self.code_set)
+        # print (len(self.code_set))
+        # with open("useful.code.pkl", "wb") as f:
+        #     pkl.dump(self.code_set, f, protocol=2)
+        #     f.close()
+
         # print (self.data_to_show)
         # print (self.label_to_show)
         # cross validation for true target
@@ -100,7 +106,18 @@ class DataLoader(object):
         # self.sample_val, self.label_val = dict(), dict()
         # for ifold in range(self.n_fold): # true target validation is consistent with pretraining
         #     self.sample_val[ifold], self.label_val[ifold] = self.generate_meta_batches(is_training=False, ifold=ifold)
-        self.episode_rep = self.generate_meta_idx_batches(is_training=False, is_represent=True)
+
+        # in order to get sample representations for some specific tasks
+        if FLAGS.rept:
+            episode_name= dict()
+            task_list = copy.deepcopy(TASKS)
+            # task_list.remove(FLAGS.source)
+            # task_list.remove(FLAGS.target)
+            self.task_list_rept = task_list
+            for task in task_list:
+                episode_name[task] = []
+            self.load_data_to_show(task_list)
+            self.episode_rep = self.generate_meta_idx_batches(is_training=False, is_represent=True, episode_name=episode_name)
 
 
     def get_cross_val(self, X, y, n_fold=5):
@@ -114,6 +131,68 @@ class DataLoader(object):
             self.data_tt_tr[ifold], self.data_tt_val[ifold] = X[train_index], X[test_index]
             self.label_tt_tr[ifold], self.label_tt_val[ifold] = y[train_index], y[test_index]
             ifold+=1
+
+    def load_data_to_show(self, task_list):
+        # only consider mlp now
+        # common_pat = dict()
+        for task in task_list:
+            # with open(self.intmd_path + task + '.common.pat.pkl', 'rb') as f:
+            #     common_pat[task] = pkl.load(f)
+            #     f.close()
+
+            if FLAGS.method == "mlp":
+                with open(self.intmd_path + task + '.pos.mat.pkl', 'rb') as f:
+                    X_pos_mat, y_pos_mat = pkl.load(f)
+                    f.close()
+                with open(self.intmd_path + task + '.neg.mat.pkl', 'rb') as f:
+                    X_neg_mat, y_neg_mat = pkl.load(f)
+                    f.close()
+
+                # aggregate (and normalize) the data
+                X_pos, y_pos = [], []
+                X_neg, y_neg = [], []
+                for s, array in X_pos_mat.items():
+                    X_pos.append(np.sum(X_pos_mat[s], axis=0))
+                    y_pos.append(y_pos_mat[s])
+
+                for s, array in X_neg_mat.items():
+                    X_neg.append(np.sum(X_neg_mat[s], axis=0))
+                    y_neg.append(y_neg_mat[s])
+
+                if FLAGS.meta_batch_size*FLAGS.update_batch_size > len(X_pos):
+                    print ("length error!")
+
+                self.data_to_show[task] = np.concatenate((X_pos[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)], X_neg[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)]), axis=0)
+                self.label_to_show[task] = np.concatenate((y_pos[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)], y_neg[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)]), axis=0)
+
+            elif FLAGS.method == "cnn" or FLAGS.method == "rnn":
+
+                with open(self.intmd_path + task + '.pos.pkl', 'rb') as f:
+                    X_pos_mat, y_pos_mat = pkl.load(f)
+                    f.close()
+
+                with open(self.intmd_path + task + '.neg.pkl', 'rb') as f:
+                    X_neg_mat, y_neg_mat = pkl.load(f)
+                    f.close()
+
+                X_pos, y_pos = [], []
+                X_neg, y_neg = [], []
+                for s, array in X_pos_mat.items():
+                     X_pos.append(array) # X_pos_mat[s] size: seq_len x n_words
+                     y_pos.append(y_pos_mat[s])
+
+                for s, array in X_neg_mat.items():
+                     X_neg.append(array)
+                     y_neg.append(y_neg_mat[s])
+
+                X_pos, X_neg = self.get_fixed_timesteps(X_pos, X_neg)
+                X_pos, X_neg = self.get_fixed_codesize(X_pos, X_neg)
+                X_pos = self.get_feed_records(X_pos)
+                X_neg = self.get_feed_records(X_neg)
+
+                self.data_to_show[task] = np.concatenate((X_pos[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)], X_neg[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)]), axis=0)
+                self.label_to_show[task] = np.concatenate((y_pos[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)], y_neg[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)]), axis=0)
+            # print ('------')
 
     def load_data_vector(self, task):
         '''load aggregated data vectors for mlp. One vector per sample'''
@@ -141,9 +220,6 @@ class DataLoader(object):
         #     self.pos_ratio = int(len(y_pos)/len(y_neg))
         # return (X_pos, X_neg), (y_pos, y_neg)
         X, y = np.concatenate((X_pos, X_neg), axis=0), np.concatenate((y_pos, y_neg), axis=0)
-        self.data_to_show[task] = X[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)]
-        self.label_to_show[task] = y[:(FLAGS.meta_batch_size*FLAGS.update_batch_size)]
-
         return X, y
 
     def load_data_matrix(self, task):
@@ -165,7 +241,6 @@ class DataLoader(object):
         # n_codes_neg = []
 
         if self.target[0] == task and self.pat_reduce is True:
-            print ("========++++++")
             counter = 0
             bounder = int(len(X_pos_mat) * self.ratio_t)
 
@@ -187,24 +262,21 @@ class DataLoader(object):
                  counter += 1
                  if counter == bounder:
                      break
-            print (len(X_pos))
-            print (len(X_neg))
         else:
-            print ("===-----===++++++")
             for s, array in X_pos_mat.items():
                  X_pos.append(array) # X_pos_mat[s] size: seq_len x n_words
                  y_pos.append(y_pos_mat[s])
+                 # self.code_set=self.code_set.union(set([i for i in array[:].ravel() if i != PADDING_ID]))
 
             for s, array in X_neg_mat.items():
                  X_neg.append(array)
                  y_neg.append(y_neg_mat[s])
-
+                 # self.code_set=self.code_set.union(set([i for i in array[:].ravel() if i != PADDING_ID]))
 
         # save code_size
         f = open(self.intmd_path + task + '.code.size.pkl', 'rb')
         self.task_code_size[task] = pkl.load(f)
         f.close()
-
         return (X_pos, X_neg), (y_pos, y_neg)
 
     def get_fixed_timesteps(self, X_pos, X_neg):
@@ -308,7 +380,7 @@ class DataLoader(object):
                 self.n_total_batches = int(len(label_t)/self.n_samples_per_task)
                 print (data_t.shape)
                 print (label_t.shape)
-                print (len(label_t))
+                # print (len(label_t))
             except:
                 print ("Error: split training and validate first!")
         # check if the meta batch file dumped
@@ -361,7 +433,7 @@ class DataLoader(object):
         print (label.shape)
         return sample, label
 
-    def generate_meta_idx_batches(self, is_training=True, ifold=0, is_represent=False):
+    def generate_meta_idx_batches(self, is_training=True, ifold=0, is_represent=False, episode_name=None):
         ''' get samples and the corresponding labels with episode for batching'''
         if is_training: # training
             prefix = "metatrain"
@@ -383,7 +455,6 @@ class DataLoader(object):
                 print (len(label_t))
             except:
                 print ("Error: split training and validate first!")
-
 
         # generate episode
         episode = []
@@ -415,7 +486,6 @@ class DataLoader(object):
         print ("batch counts: ", batch_count)
 
         if is_represent:
-            episode = {"AD":[], "PD":[], "AM":[], "DM":[], "MCI":[]}
             for task in self.data_to_show:
                 try:
                     data_s = self.data_s
@@ -423,33 +493,34 @@ class DataLoader(object):
                     data_t = self.data_to_show[task]
                     label_t = self.label_to_show[task]
                     self.n_total_batches = int(len(label_t)/self.n_samples_per_task)
-                    print (data_t.shape)
-                    print (label_t.shape)
-                    print (len(label_t))
                 except:
                     print ("Error: split training and validate first!")
 
                 # generate episode
-
+                episode = episode_name
+                # print (episode_name)
                 s_dict, t_dict = dict(), dict()
                 for i in range(len(self.source)):
                     s_dict[i] = range(len(self.label_s[i]))
+
+                t_list = list(range(len(label_t)))
+                random.shuffle(t_list)
                 batch_count = 0
                 for _ in tqdm.tqdm(range(self.n_total_batches), 'generating meta batches'): # progress bar
                     # i.e., sample 16 patients from selected tasks
                     # len of spl and lbl: 4 * 16
                     idx = [] # index in one episode
                     for i in range(len(self.source)): # fetch from source tasks olderly
-                        ### do not keep pos/neg ratio
                         s_idx = random.sample(s_dict[i], self.n_samples_per_task)
                         idx.extend(s_idx)
-                    ### do not keep pos/neg ratio
-                    t_idx = range(batch_count*self.n_samples_per_task, (batch_count+1)*self.n_samples_per_task)
+                    # t_idx = range(batch_count*self.n_samples_per_task, (batch_count+1)*self.n_samples_per_task)
+                    t_idx = random.sample(t_list, self.n_samples_per_task)
                     idx.extend(t_idx)
+                    t_list = list(set(t_list) - set(t_idx))
                     batch_count += 1
                     # add meta_batch
                     episode[task].append(idx)
-
+                # print (episode[task])
         return episode
 
 
