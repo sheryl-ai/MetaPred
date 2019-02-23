@@ -42,7 +42,7 @@ python main.py --method='cnn' --metatrain_iterations=10000 --meta_batch_size=32 
 ```
 or
 ```bash
-python main.py --method='rnn' --metatrain_iterations=10000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.0001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
+python main.py --method='rnn' --metatrain_iterations=10000 --meta_batch_size=32 --update_batch_size=4 --meta_lr=0.001 --update_lr=1e-5 --num_updates=4 --n_total_batches=500000
 ```
 
 ### Additional Material
