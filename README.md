@@ -20,7 +20,7 @@ The learned representations of patients in five disease domains are visualized b
 
 To demonstrate the effectiveness of the proposed MetaPred in the context of domain adaptation, we compare it with the state-of-the-art meta-learning algorithm ``Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks`` (MAML). The results on Alzheimer's Disease domain are presented in terms of AUC and F1-Score.
 
-<p align="center"><img src="figures/vs_maml_ad.png" alt="Performance comparison of MetaPred and MAML on the top of Alzheimer's Disease" width="500"></p>
+<p align="center"><img src="figures/vs_maml_ad_cnn.png" alt="Performance comparison of MetaPred and MAML on the top of Alzheimer's Disease" width="500"></p>
 
 
 ## Requirements
