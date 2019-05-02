@@ -110,6 +110,7 @@ def main():
     print ("The simulated target task is: ", " ".join(target))
     print ("The true target task is: ", " ".join(true_target))
     n_tasks = len(source) + len(target)
+    
 
     # load ehrs data
     data_loader = DataLoader(source, target, true_target, n_tasks,
