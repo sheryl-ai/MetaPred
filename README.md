@@ -49,3 +49,5 @@ python main.py --method='rnn' --metatrain_iterations=10000 --meta_batch_size=32 
 There is implementations used in:
 
 Chelsea Finn, Pieter Abbeel, Sergey Levine, [Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks](https://arxiv.org/abs/1703.03400), International Conference on Machine Learning (ICML), 2017.
+
+We will upload FAKE data soon ...
