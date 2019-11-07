@@ -59,7 +59,6 @@ def train(data_loader, ifold, exp_string):
     sess = m1.fit(data_loader.episode, data_loader.episode_val[ifold], ifold, exp_string)
     return m1, sess
 
-
 def test(data_loader, ifold, m, sess, exp_string):
     # meta-testing the model
     print ("model test...")
@@ -70,16 +69,14 @@ def test(data_loader, ifold, m, sess, exp_string):
     return test_accs, test_aucs, test_ap, test_f1s
 
 
-def fine_tune(data_loader, ifold, meta_m, exp_string):
+def fine_tune(data_loader, ifold, meta_m, weights_for_finetune, exp_string):
     # construct MetaPred model
     is_finetune = True
     print ("finetunning MetaPred model ...")
-    if FLAGS.method == "mlp":
-        m2 = finetune.MLP(data_loader, meta_m, freeze_opt=freeze_opt, is_finetune=is_finetune)
     if FLAGS.method == "cnn":
-        m2 = finetune.CNN(data_loader, meta_m, freeze_opt=freeze_opt, is_finetune=is_finetune)
+        m2 = finetune.CNN(data_loader, weights_for_finetune, freeze_opt=freeze_opt, is_finetune=is_finetune)
     if FLAGS.method == "rnn":
-        m2 = finetune.RNN(data_loader, meta_m, freeze_opt=freeze_opt, is_finetune=is_finetune)
+        m2 = finetune.RNN(data_loader, weights_for_finetune, freeze_opt=freeze_opt, is_finetune=is_finetune)
     print ("model finetunning...")
 
     # model finetunning
@@ -97,6 +94,18 @@ def save_results(metatest, exp_string):
             writer.writerow([np.std(np.array(metatest[key]))])
     print ("results saved")
 
+def save_weights(meta_m, source, target, true_target, data_loader, ifold):
+    with open("weights/meta-" + FLAGS.method + ".weights" + ".source_" + "-".join(source) + ".starget_" + "".join(target) + ".ttarget_" + "".join(true_target) + ".pkl", 'wb') as f:
+        pkl.dump((meta_m.weights_for_finetune), f, protocol=2)
+        f.close()
+    with open("weights/meta-" + FLAGS.method + ".tt_train" + ".source_" + "-".join(source) + ".starget_" + "".join(target) + ".ttarget_" + "".join(true_target) + ".pkl", 'wb') as f:
+        pkl.dump((data_loader.tt_sample[ifold], data_loader.tt_label[ifold]), f, protocol=2)
+        f.close()
+    with open("weights/meta-" + FLAGS.method + ".tt_val" + ".source_" + "-".join(source) + ".starget_" + "".join(target) + ".ttarget_" + "".join(true_target) + ".pkl", 'wb') as f:
+        pkl.dump((data_loader.tt_sample_val[ifold], data_loader.tt_label_val[ifold]), f, protocol=2)
+        f.close()
+    print("model weights saved")
+
 
 def main():
     print (FLAGS.method)
@@ -110,7 +119,7 @@ def main():
     print ("The simulated target task is: ", " ".join(target))
     print ("The true target task is: ", " ".join(true_target))
     n_tasks = len(source) + len(target)
-    
+
 
     # load ehrs data
     data_loader = DataLoader(source, target, true_target, n_tasks,
@@ -127,9 +136,13 @@ def main():
 
         if FLAGS.train:
             meta_model, sess = train(data_loader, ifold, exp_string)
+            save_weights(meta_model, source, target, true_target, data_loader, ifold)
 
         if FLAGS.finetune:
-             model, sess = fine_tune(data_loader, ifold, meta_model, exp_string)
+             with open("weights/meta-" + FLAGS.method + ".weights" + ".source_" + "-".join(source) + ".starget_" + "".join(target) + ".ttarget_" + "".join(true_target) + ".pkl", 'rb') as f:
+                 weights_for_finetune = pkl.load(f)
+                 f.close()
+             model, sess = fine_tune(data_loader, ifold, meta_model, weights_for_finetune, exp_string)
 
         if FLAGS.test:
             _, test_aucs, test_ap, test_f1s = test(data_loader, ifold, meta_model, sess, exp_string)
