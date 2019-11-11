@@ -2,7 +2,7 @@
 
 ## Overview
 
-MetaPred is a meta-learning framework for  Clinical Risk Prediction using limited patient Electronic Health Records (EHRs). We given an example in the following figure:
+MetaPred is a meta-learning framework for Clinical Risk Prediction using limited patient Electronic Health Records (EHRs). We given an example in the following figure:
 
 <p align="center"><img src="figures/task-design.png" alt=" Illustration of the proposed learning procedure" width="500"></p>
 
@@ -50,4 +50,26 @@ There is implementations used in:
 
 Chelsea Finn, Pieter Abbeel, Sergey Levine, [Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks](https://arxiv.org/abs/1703.03400), International Conference on Machine Learning (ICML), 2017.
 
-We will upload FAKE data soon ...
+## References 
+If you happen to use our work, please consider citing our paper: 
+```
+@inproceedings{Zhang:2019:MMC:3292500.3330779,
+ author = {Zhang, Xi Sheryl and Tang, Fengyi and Dodge, Hiroko H. and Zhou, Jiayu and Wang, Fei},
+ title = {MetaPred: Meta-Learning for Clinical Risk Prediction with Limited Patient Electronic Health Records},
+ booktitle = {Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining},
+ series = {KDD '19},
+ year = {2019},
+ isbn = {978-1-4503-6201-6},
+ location = {Anchorage, AK, USA},
+ pages = {2487--2495},
+ numpages = {9},
+ url = {http://doi.acm.org/10.1145/3292500.3330779},
+ doi = {10.1145/3292500.3330779},
+ acmid = {3330779},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {clinical risk prediction, electronic health records, meta-learning},
+} 
+```
+This paper can be accessed on : [MetaPred] (https://dl.acm.org/citation.cfm?id=3330779)
+
