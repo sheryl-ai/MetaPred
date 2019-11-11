@@ -61,10 +61,6 @@ If you happen to use our work, please consider citing our paper:
  year = {2019},
  location = {Anchorage, AK, USA},
  pages = {2487--2495},
- numpages = {9},
- publisher = {ACM},
- address = {New York, NY, USA},
- keywords = {clinical risk prediction, electronic health records, meta-learning},
 } 
 ```
 This paper can be accessed on : [MetaPred] (https://dl.acm.org/citation.cfm?id=3330779)
