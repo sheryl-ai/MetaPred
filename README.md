@@ -1,4 +1,5 @@
 # MetaPred
+The repo is code (baseline and the proposed MetaPred) for paper MetaPred: Meta-Learning for Clinical Risk Prediction with Limited Patient Electronic Health Records by [Xi Sheryl Zhang](https://www.xi-zhang.net), [Fengyi Tang](https://github.com/af1tang), [Hiroko H. Dodge](https://medicine.umich.edu/dept/neurology/hiroko-dodge-phd), [Jiayu Zhou](https://jiayuzhou.github.io), and [Fei Wang](https://sites.google.com/site/cornellwanglab/home).  
 
 ## Overview
 
@@ -31,6 +32,18 @@ This package has the following requirements:
 
 
 ## Usage
+### Baseline in Sequential Data Modeling 
+The [baseline implementation](https://github.com/sheryl-ai/MetaPred/tree/master/baselines) includes:
+* Logistic Regression
+* K-Nearest Neighbors 
+* XGBoost 
+* SVM
+* Random Forest
+* MLP
+* LSTM
+* CNN
+which can be used in any sort of sequence modeling, especially EHRs, directly.
+
 ### How to Run
 To run MetaPred on EHR data, you need to revise the learning settings in main.py and the network hyperparameters in model.py. Then run the shell script metapred.sh.
 ```bash
