@@ -43,7 +43,7 @@ The [baseline implementation](https://github.com/sheryl-ai/MetaPred/tree/master/
 * LSTM
 * CNN
 
-which can be used in any sort of sequence modeling, especially EHRs, directly.
+which can be used in any sort of sequence modeling, especially for EHRs data, directly.
 
 ### How to Run
 To run MetaPred on EHR data, you need to revise the learning settings in main.py and the network hyperparameters in model.py. Then run the shell script metapred.sh.
