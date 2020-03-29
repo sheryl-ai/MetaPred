@@ -42,6 +42,7 @@ The [baseline implementation](https://github.com/sheryl-ai/MetaPred/tree/master/
 * MLP
 * LSTM
 * CNN
+
 which can be used in any sort of sequence modeling, especially EHRs, directly.
 
 ### How to Run
